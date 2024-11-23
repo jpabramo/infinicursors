@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN" "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+
+<svg xmlns="http://www.w3.org/2000/svg" 
+  width="64" height="102">
+  
+  <path id="Cursor"
+    
+    fill="white" stroke="black" stroke-width="4"
+    d="
+      M 40,50 24,80 100,50
+      24,20 40,50Z
+    "
+    transform="translate(-95 -44) rotate(-112.62 99 50)"
+  />
+</svg>
