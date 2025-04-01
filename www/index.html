@@ -1,29 +1,56 @@
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>InfiniCursors</title>
-  <script src="src/main.js" defer></script>
+  <script type="module" src="src/modules/Cursor.js"></script>
+  <script type="module" src="src/modules/Command.js"></script>
+  <script type="module" src="src/main.js" defer></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body onclick="skinSelect(mySkin)">
-  <div id="skin_select" style="display: none;">
-    <div class="skin" onclick="skinSelect(0)">
-      <img src="image/cursor-0.svg">
-      <div>Arrow Light</div>
+
+<body>
+  <div id="skin_select">
+    <div class="row">
+      <div class="item" id="skin_0">
+        <svg id="cursor-arrow-light" viewBox="0 0 80 100">
+          <path fill="white" stroke="black" stroke-width="4" d="
+          M 0,56
+          L 30,56 24,80 100,50
+          24,20 30,44 0,44Z
+        " transform="translate(-95 -44) rotate(-112.62 99 50)" />
+        </svg>
+      </div>
+      <div class="item" id="skin_1">
+        <svg id="cursor-plane-light" viewBox="0 0 80 100">
+          <path fill="white" stroke="black" stroke-width="4" d="
+          M 40,50 24,80 100,50
+          24,20 40,50Z
+        " transform="translate(-95 -44) rotate(-112.62 99 50)" />
+        </svg>
+      </div>
     </div>
-    <div class="skin" onclick="skinSelect(1)">
-      <img src="image/cursor-1.svg">
-      <div>Arrow Dark</div>
-    </div>
-    <div class="skin" onclick="skinSelect(2)">
-      <img src="image/cursor-2.svg">
-      <div>Airplane Light</div>
-    </div>
-    <div class="skin" onclick="skinSelect(3)">
-      <img src="image/cursor-3.svg">
-      <div>Airplane Dark</div>
+    <div class="row">
+      <div class="item" id="skin_2">
+        <svg id="cursor-arrow-dark" viewBox="0 0 80 100">
+          <path fill="black" stroke="white" stroke-width="4" d="
+          M 0,56
+          L 30,56 24,80 100,50
+          24,20 30,44 0,44Z
+        " transform="translate(-95 -44) rotate(-112.62 99 50)" />
+        </svg>
+      </div>
+      <div class="item" id="skin_3">
+        <svg id="cursor-plane-dark" viewBox="0 0 80 100">
+          <path fill="black" stroke="white" stroke-width="4" d="
+          M 40,50 24,80 100,50
+          24,20 40,50Z
+        " transform="translate(-95 -44) rotate(-112.62 99 50)" />
+        </svg>
+      </div>
     </div>
   </div>
 </body>
+
 </html>

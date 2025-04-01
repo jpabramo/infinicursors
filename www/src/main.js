@@ -1,54 +1,14 @@
-const CURSORS = {};
+import { Command, PositionCommand, HideCommand } from "./modules/Command.js";
+import { Cursor } from "./modules/Cursor.js";
 
-const SOCK_URL = `ws://${location.hostname || "localhost"}/sock`;
+const SOCK_URL = `ws://${location.hostname || "localhost"}:${location.port}/sock`;
 var SOCKET;
 
-var command;
-var sending = false;
-var myId;
-var mySkin = getCookies()["mySkin"] || 0;
-document.cookie = `mySkin=${mySkin}`;
-
-function getCookies() {
-  var retval = {};
-  for(var line of document.cookie.split(";")) {
-    if(line.indexOf("=") == -1) {
-      continue;
-    }
-    var lineSplit = line.trim().split("=");
-    var key = lineSplit[0].trim();
-    var val = lineSplit[1].trim();
-    retval[key] = val;
-  } 
-  return retval;
+function saveSkin() {
+  document.cookie = `skin=${Cursor.myCursor.skin}`;
 }
 
 const SKIN_SELECT = document.getElementById("skin_select");
-
-function createCursor(id) {
-  var cursor = CURSORS[id] = document.createElement("img");
-  cursor.src = `image/cursor-0.svg`;
-  cursor.className = "cursor";
-  cursor.id = `C${id}`;
-  document.body.appendChild(cursor);
-  return cursor;
-}
-
-async function updateCursor(id, x, y, skin) {
-  var cursor = CURSORS[id] || createCursor(id);
-  cursor.style.left = x;
-  cursor.style.top = y;
-  cursor.src = `image/cursor-${skin}.svg`;
-}
-
-async function removeCursor(id) {
-  var cursor = CURSORS[id];
-
-  if(cursor != undefined) {
-    cursor.remove();
-    CURSORS[id] = null;
-  }
-}
 
 async function handleMessage(event) {
   // console.log("Processing received message");
@@ -62,64 +22,23 @@ async function handleMessage(event) {
     console.warn("Unexpected message type received");
     return;
   }
+  
+  // console.log(new Uint8Array(message));
 
-  var start = 0;
-  while(start < message.byteLength) {
-    var cmd = new Int8Array(message.slice(start, start+1))[0];
-    start += 1;
-    var id = new Int32Array(message.slice(start, start+4))[0];
-    start += 4;
-    // console.log(`Updating cursor #${id}`);
-    switch(cmd) {
-      case 0:
-        var x = new Int32Array(message.slice(start, start+4))[0];
-        start += 4;
-        var y = new Int32Array(message.slice(start, start+4))[0];
-        start += 4;
-        var skin = new Int8Array(message.slice(start, start+1))[0];
-        start += 1;
-        // console.log(`Updating coords = ${x} x ${y}`);
-        if(id != myId) {
-          updateCursor(id, x, y, skin);
-        }
-        
-        break;
-      case 1:
-        // console.log(`Removing`);
-        if(id != myId) {
-          removeCursor(id);
-        }
-    }
-  }
+  Command.execute(message);
 
   document.body.style.width = document.body.scrollWidth;
   document.body.style.height = document.body.scrollHeight;
-}
-
-async function handleFirstMessage(event) {
-  var message;
-  if(event.data instanceof Blob) {
-    message = await event.data.arrayBuffer();
-  } else if(event.data instanceof ArrayBuffer) {
-    message = await event.data;
-  } else {
-    console.warn("Unexpected message type received");
-    return;
-  }
-
-  var view = new Int32Array(message);
-  myId = view[0];
-  var cursor = createCursor(myId);
-  cursor.src = `image/cursor-${mySkin}.svg`;
-  document.styleSheets[0].insertRule(`#${cursor.id} {z-index: 2;}`);
-  console.info(`Welcome! You are cursor #${myId}`);
-  SOCKET.onmessage = handleMessage
 }
 
 SOCKET = createSocket();
 
 function reconnect() {
   console.info("Reconnecting to server...");
+  for(var cursorId in Cursor.CURSORS) {
+    Cursor.removeCursor(cursorId);
+  }
+
   if(SOCKET != undefined) {
     SOCKET.close();
   }
@@ -130,52 +49,53 @@ function reconnect() {
 function createSocket() {
   var retval = new WebSocket(SOCK_URL);
   retval.binaryType = "arraybuffer";
-  retval.onmessage = handleFirstMessage;
+  retval.onmessage = handleMessage;
   retval.onerror = (event) => {
     console.warn("The socket has closed with an error");
-  }
+  };
   retval.onclose = (event) => {
     console.warn("The socket has closed");
-  }
+  };
   return retval;
 }
+document.body.ontouchmove = (event) => {
+  event.preventDefault();
 
-async function sendCommand(cmd) {
-  if(SOCKET.readyState != SOCKET.OPEN) {
-    return;
-  }
+  Cursor.updateCursor(
+    Cursor.myCursor.id, 
+    event.touches.item(0).pageX, 
+    event.touches.item(0).pageY, 
+    Cursor.myCursor.skin
+  );
 
-  SOCKET.send(cmd);
+  new PositionCommand(
+    Cursor.myCursor.id,
+    event.touches.item(0).pageX,
+    event.touches.item(0).pageY,
+    Cursor.myCursor.skin
+  ).send(SOCKET);
 }
 
-document.body.onmousemove = async (event) => {
-  if(myId != undefined) {
-    updateCursor(myId, event.pageX, event.pageY, mySkin);
-  }
+document.body.onmousemove = (event) => {
+  Cursor.updateCursor(
+    Cursor.myCursor.id, 
+    event.pageX, 
+    event.pageY, 
+    Cursor.myCursor.skin
+  );
 
-  updatePosition(event.pageX, event.pageY);
+  new PositionCommand(
+    Cursor.myCursor.id,
+    event.pageX,
+    event.pageY,
+    Cursor.myCursor.skin
+  ).send(SOCKET);
 };
 
 document.body.onmouseleave = (event) => {
-  if(myId != undefined) {
-    removeCursor(myId);
-  }
+  Cursor.myCursor.hide();
 
-  var cmd = new ArrayBuffer(0);
-  sendCommand(cmd)
-}
-
-function updatePosition(x, y) {
-  var buff = new ArrayBuffer(4);
-  var view = new Int32Array(buff);
-  var cmd = new Int8Array(9);
-
-  view[0] = x;
-  cmd.set(new Int8Array(buff));
-  view[0] = y;
-  cmd.set(new Int8Array(buff), 4);
-  cmd.set(new Int8Array([mySkin]), 8);
-  sendCommand(cmd);
+  new HideCommand(Cursor.myCursor.id).send(SOCKET);
 }
 
 setInterval(() => {
@@ -192,18 +112,38 @@ document.body.oncontextmenu = (event) => {
   return false;
 }
 
-function skinSelect(id) {
-  mySkin = id;
-  var cursor = CURSORS[myId];
-  
-  if(cursor != null) {
-    cursor.src = `image/cursor-${mySkin}.svg`;
-    document.cookie = `mySkin=${mySkin}`;
-    updatePosition(
-      parseInt(cursor.style.left), 
-      parseInt(cursor.style.top)
-    );
-  }
-
+function hideSelect() {
   SKIN_SELECT.style.display = "none";
+}
+
+function chooseSkin(id) {
+  console.debug(`Setting skin to #${id}`);
+  Cursor.myCursor.update(
+    Cursor.myCursor.x,
+    Cursor.myCursor.y,
+    id
+  );
+  saveSkin();
+  hideSelect();
+}
+
+for(var elem of document.getElementsByClassName("item")) {
+  const skinId = parseInt(elem.id.split("_")[1]);
+  elem.onclick = () => {
+    chooseSkin(skinId);
+  }
+}
+
+function arrToHex(arr) {
+  var retval = "";
+  for(var val of arr) {
+    retval += val.toString(16).padStart(2, "0");
+  }
+  return retval;
+}
+
+document.body.onclick = (event) => {
+  if(event.target == document.body) {
+    hideSelect();
+  }
 }

@@ -5,12 +5,14 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.tomcat.util.http.fileupload.FileUtils;
 
-public class CursorServer {
+public class CursorServer implements AutoCloseable {
   public final Path SERVER_DIR = Path.of("www/");
   public int port;
   public Tomcat tom;
@@ -19,7 +21,7 @@ public class CursorServer {
     @Override
     public void run() {
       while(!isInterrupted()) {
-        CursorUser[] usersToUpdate;
+        Set<CursorUser> usersToUpdate;
         synchronized(CursorUser.USERS_TO_UPDATE) {
           try {
             CursorUser.USERS_TO_UPDATE.wait();
@@ -31,21 +33,18 @@ public class CursorServer {
             continue;
           }
 
-          usersToUpdate = CursorUser.USERS_TO_UPDATE.toArray((new CursorUser[1]));
+          usersToUpdate = new HashSet<>(CursorUser.USERS_TO_UPDATE);
           CursorUser.USERS_TO_UPDATE.clear();
-
-          // System.out.printf(
-          //   "Sending update message for %d user%s%n", 
-          //   usersToUpdate.length, 
-          //   usersToUpdate.length > 1? "s": ""
-          // );
         }
         
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         
         try {
           for(CursorUser user : usersToUpdate) {
-            buffer.write(user.command);
+            if(user.command != null) {
+              // System.out.println("Adding " + user.command + " to the buffer");
+              buffer.write(user.command.toBuff().array());
+            }
           }
         } catch (IOException e) {
           e.printStackTrace();
@@ -94,11 +93,23 @@ public class CursorServer {
     tom.getConnector().setURIEncoding("UTF-8");
     tom.start();
     broadcastThread.start();
-    tom.getServer().await();
   }
 
   public static void main(String[] args) throws IOException, LifecycleException {
-    CursorServer server = new CursorServer(80);
-    server.start();
+    try (CursorServer server = new CursorServer(8080)) {
+      server.start();
+      server.tom.getServer().await();
+    } catch (IOException e) {
+      throw e;
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  @Override
+  public void close() throws Exception {
+    broadcastThread.interrupt();
+    tom.stop();
+    tom.destroy();
   }
 }
